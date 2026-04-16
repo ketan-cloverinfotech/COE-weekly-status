@@ -35,6 +35,7 @@ export default function App(){
   const[tab,setTab]=useState(0);
   const[copied,setCopied]=useState(false);
   const[msg,setMsg]=useState("");
+  const[importSuccess,setImportSuccess]=useState(false);
   const fRef=useRef(null);
   const sv=load();
   const[mDate,setMDate]=useState(sv?.meetingDate||new Date().toISOString().split("T")[0]);
@@ -64,6 +65,9 @@ export default function App(){
   }
   function doImport(e){
     const f=e.target.files?.[0];if(!f)return;
+    // ⚠️ FIX: Reset input BEFORE readAsText — resetting after causes Chromium
+    // browsers to silently cancel the read, so onload never fires and no data loads.
+    e.target.value="";
     const r=new FileReader();
     r.onload=(ev)=>{
       try{
@@ -80,10 +84,19 @@ export default function App(){
         setNDate(getNextFriday(new Date()));
         setDisc([{id:uid(),desc:"",owner:"",status:"Done",remarks:""}]);
         setLvs([{id:uid(),name:"",period:"",responsible:"",remarks:""}]);
-        setMsg("Imported from "+(d.meetingDate?fmtDate(d.meetingDate):"file")+". Pending, Hold, Hiring & Team carried forward. Attendance, Discussed & Leaves reset.");
-        setTimeout(()=>setMsg(""),8000);
-      }catch{setMsg("Error: Invalid JSON file.");setTimeout(()=>setMsg(""),5000);}
-    };r.readAsText(f);e.target.value="";
+        setMsg("✅ JSON imported successfully! Imported from "+(d.meetingDate?fmtDate(d.meetingDate):"file")+". Pending, Hold, Hiring & Team carried forward. Attendance, Discussed & Leaves reset.");
+        setImportSuccess(true);
+        setTimeout(()=>{setMsg("");setImportSuccess(false);},5000);
+      }catch{
+        setMsg("❌ Error: Invalid JSON file. Please export a valid MoM JSON first.");
+        setTimeout(()=>setMsg(""),5000);
+      }
+    };
+    r.onerror=()=>{
+      setMsg("❌ Error: Could not read the file.");
+      setTimeout(()=>setMsg(""),5000);
+    };
+    r.readAsText(f);
   }
   function toHold(i){const it=pend[i];setHold(p=>[...p,{...it,status:"Hold"}]);setPend(p=>p.filter((_,j)=>j!==i));}
   function toDone(i){const it=pend[i];setHold(p=>[...p,{...it,status:"Completed"}]);setPend(p=>p.filter((_,j)=>j!==i));}
@@ -180,12 +193,21 @@ export default function App(){
             <button onClick={doReset} className="px-3.5 py-1.5 rounded-lg text-xs font-semibold text-red-500 hover:bg-red-50 transition">Reset</button>
           </div>
         </div>
-        {msg&&<div className="max-w-6xl mx-auto px-5 pb-2"><div className={`px-4 py-2.5 rounded-xl text-xs font-medium ${msg.startsWith("Error")?"bg-red-50 text-red-700 border border-red-200":"bg-emerald-50 text-emerald-700 border border-emerald-200"}`}>{msg}</div></div>}
+        {msg&&<div className="max-w-6xl mx-auto px-5 pb-2"><div className={`px-4 py-2.5 rounded-xl text-sm font-semibold ${msg.startsWith("❌")?"bg-red-50 text-red-700 border border-red-200":"bg-emerald-50 text-emerald-800 border border-emerald-300"}`}>{msg}</div></div>}
         <div className="max-w-6xl mx-auto px-5 flex gap-0.5 overflow-x-auto pb-0">
           {TABS.map((t,i)=>(<button key={t.l} onClick={()=>setTab(i)} className={`whitespace-nowrap px-4 py-2.5 text-xs font-semibold rounded-t-xl transition-all border-b-2 ${tab===i?"border-blue-600 text-blue-700 bg-blue-50/50":"border-transparent text-slate-400 hover:text-slate-600 hover:bg-slate-50"}`}><span className="mr-1.5">{t.i}</span>{t.l}</button>))}
         </div>
       </header>
 
+      {importSuccess&&(
+        <div style={{position:"fixed",top:"50%",left:"50%",transform:"translate(-50%,-50%)",zIndex:9999,pointerEvents:"none"}}>
+          <div style={{background:"#fff",border:"2px solid #10b981",borderRadius:"20px",padding:"28px 40px",boxShadow:"0 20px 60px rgba(0,0,0,0.18)",textAlign:"center",minWidth:"300px"}}>
+            <div style={{fontSize:"52px",lineHeight:1}}>✅</div>
+            <div style={{marginTop:"12px",fontSize:"18px",fontWeight:700,color:"#065f46"}}>JSON Imported!</div>
+            <div style={{marginTop:"6px",fontSize:"13px",color:"#047857"}}>Data loaded successfully</div>
+          </div>
+        </div>
+      )}
       <main className="max-w-6xl mx-auto px-5 py-6">
         {tab===0&&(<div className="space-y-5"><div className={C}><h2 className={T}>Meeting Details</h2><p className="text-sm text-slate-500 mt-1 mb-5">Next meeting date auto-calculates to next Friday.</p><div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"><div><label className={L}>Date of Meeting</label><input type="date" value={mDate} onChange={e=>setMDate(e.target.value)} className={I}/></div><div><label className={L}>Next Meeting Date</label><input type="date" value={nDate} onChange={e=>setNDate(e.target.value)} className={I}/></div><div><label className={L}>Time Started</label><input value={time} onChange={e=>setTime(e.target.value)} className={I}/></div><div><label className={L}>Duration</label><input value={dur} onChange={e=>setDur(e.target.value)} className={I}/></div><div><label className={L}>Venue</label><input value={ven} onChange={e=>setVen(e.target.value)} className={I}/></div><div><label className={L}>Prepared By</label><input value={prep} readOnly className={I+" bg-slate-50 text-slate-400"}/></div></div></div>
           <div className="bg-blue-50 border border-blue-200 rounded-2xl p-5"><h3 className="text-sm font-bold text-blue-800 mb-2">{"\u{1F4D6}"} Weekly Workflow</h3><div className="text-xs text-blue-700 space-y-1.5 leading-relaxed"><p><strong>First time?</strong> Click <strong>{"\u{1F4E5}"} Import JSON</strong> to load previous week's data. Pending, Hold, Hiring & Team carry forward. Attendance, Discussed & Leaves reset.</p><p><strong>Every week:</strong> {"\u2460"} Set date {"\u2192"} {"\u2461"} Mark attendance {"\u2192"} {"\u2462"} Add discussed points {"\u2192"} {"\u2463"} Update pending {"\u2192"} {"\u2464"} Leaves {"\u2192"} {"\u2465"} Generate {"\u2192"} {"\u2466"} Copy to Outlook</p><p><strong>After sending:</strong> Click <strong>{"\u{1F4E4}"} Export JSON</strong> to save. Import it next week.</p></div></div></div>)}
