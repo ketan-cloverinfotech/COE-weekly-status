@@ -72,7 +72,8 @@ export default function App(){
     r.onload=(ev)=>{
       try{
         const d=JSON.parse(ev.target.result);
-        if(d.team)setTeam(d.team.map(t=>({...t,present:false})));
+        // Restore ALL fields from JSON — nothing is discarded
+        if(d.team)setTeam(d.team);
         if(d.pending)setPend(d.pending);
         if(d.hold)setHold(d.hold);
         if(d.hiring)setHire(d.hiring);
@@ -80,11 +81,11 @@ export default function App(){
         if(d.duration)setDur(d.duration);
         if(d.venue)setVen(d.venue);
         if(d.nextMeetingItems)setNmi(d.nextMeetingItems);
-        setMDate(new Date().toISOString().split("T")[0]);
-        setNDate(getNextFriday(new Date()));
-        setDisc([{id:uid(),desc:"",owner:"",status:"Done",remarks:""}]);
-        setLvs([{id:uid(),name:"",period:"",responsible:"",remarks:""}]);
-        setMsg("✅ JSON imported successfully! Imported from "+(d.meetingDate?fmtDate(d.meetingDate):"file")+". Pending, Hold, Hiring & Team carried forward. Attendance, Discussed & Leaves reset.");
+        if(d.discussed)setDisc(d.discussed);
+        if(d.leaves)setLvs(d.leaves);
+        if(d.meetingDate)setMDate(d.meetingDate);
+        if(d.nextMeetingDate)setNDate(d.nextMeetingDate);
+        setMsg("✅ JSON imported successfully! All data restored from "+(d.meetingDate?fmtDate(d.meetingDate):"file")+".");
         setImportSuccess(true);
         setTimeout(()=>{setMsg("");setImportSuccess(false);},5000);
       }catch{
